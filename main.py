@@ -43,5 +43,5 @@ def process(paths):
         cv2.imwrite(output, imagenew)
         print(f"Processed image saved as: {output}")
 
-paths = ["image1.jpg"]
+paths = ["image1.jpg", "image2.jpg", "image3.jpg","image4.jpg","image5.jpg"]
 process(paths)
