@@ -1,47 +1,54 @@
-import cv2
-import numpy as np
+from PIL import Image
 
-
-ROBINSON_MASK = [
-    np.array([[1, 0, -1], [2, 0, -2], [1, 0, -1]]),  
-    np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]),  
-    np.array([[1, 2, 1], [0, 0, 0], [-1, -2, -1]]),  
-    np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]]),  
-    np.array([[2, -1, 0], [-1, 0, 1], [0, 1, -2]]),  
-    np.array([[-2, -1, 0], [-1, 0, 1], [0, 1, 2]]),  
-    np.array([[0, 1, 2], [-1, 0, 1], [-2, -1, 0]]),  
-    np.array([[0, -1, -2], [1, 0, -1], [2, 1, 0]])   
+ROBINSON_MASKS = [
+    [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]],  
+    [[0, 1, 2], [-1, 0, 1], [-2, -1, 0]],  
+    [[1, 2, 1], [0, 0, 0], [-1, -2, -1]],  
+    [[2, 1, 0], [1, 0, -1], [0, -1, -2]],  
+    [[1, 0, -1], [2, 0, -2], [1, 0, -1]],  
+    [[0, -1, -2], [1, 0, -1], [2, 1, 0]],  
+    [[-1, -2, -1], [0, 0, 0], [1, 2, 1]],  
+    [[-2, -1, 0], [-1, 0, 1], [0, 1, 2]],  
 ]
 
-def apply(image):
-    height, width = image.shape
-    edgeimg = np.zeros_like(image, dtype=np.uint8)
 
+def readimg(filename):
+    image = Image.open(filename).convert("L")
+    pixels = list(image.getdata())
+    width, height = image.size
+    return [pixels[i * width:(i + 1) * width] for i in range(height)], width, height
+
+def save(image, filename):
+    height = len(image)
+    width = len(image[0])
+    output = Image.new("L", (width, height))
+    flat_pixels = [image[y][x] for y in range(height) for x in range(width)]
+    output.putdata(flat_pixels)
+    output.save(filename)
+
+def apply(image, width, height):
+    edge_image = [[0 for _ in range(width)] for _ in range(height)]
     for y in range(1, height - 1):
         for x in range(1, width - 1):
             max_gradient = 0
-
-            
-            for mask in ROBINSON_MASK:
-                region = image[y-1:y+2, x-1:x+2]
-                gradient = np.sum(region * mask)
+            for mask in ROBINSON_MASKS:
+                gradient = 0
+                for dy in range(-1, 2):
+                    for dx in range(-1, 2):
+                        gradient += image[y + dy][x + dx] * mask[dy + 1][dx + 1]
                 max_gradient = max(max_gradient, abs(gradient))
+            edge_image[y][x] = min(255, max_gradient)
+    return edge_image
 
-            edgeimg[y, x] = min(255, max_gradient)
+def process(filepaths):
+    for filepath in filepaths:
+        try:
+            image, width, height = readimg(filepath)
+            edge_image = apply(image, width, height)
+            op = "output" + filepath.split(".")[0] + ".jpeg"
+            save(edge_image, op)
+        except Exception as e:
+            print(f"Failed to process {filepath}: {e}")
 
-    return edgeimg
-
-def process(paths):
-    for path in paths:
-        image = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
-        if image is None:
-            print(f"Error: Could not read {path}")
-            continue
-
-        imagenew = apply(image)
-        output = f"new{path}"
-        cv2.imwrite(output, imagenew)
-        print(f"Processed image saved as: {output}")
-
-paths = ["image1.jpg", "image2.jpg", "image3.jpg","image4.jpg","image5.jpg"]
-process(paths)
+filepaths = ["image1.jpeg", "image2.jpeg", "image3.jpeg", "image4.jpeg", "image5.jpeg"]
+process(filepaths)
